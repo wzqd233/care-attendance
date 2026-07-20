@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>基础托管考勤 2026-2027</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--pri:#3B82F6;--pri-l:#EFF6FF;--care:#16A34A;--care-bg:#DCFCE7;--int:#EA580C;--int-bg:#FFF7ED;--red:#DC2626;--red-bg:#FEF2F2;--g50:#F9FAFB;--g100:#F3F4F6;--g200:#E5E7EB;--g400:#9CA3AF;--g600:#4B5563;--g800:#1F2937;--rad:10px}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:var(--g50);color:var(--g800);font-size:14px;padding-bottom:64px;overflow-x:hidden}
+.hd{background:linear-gradient(135deg,#3B82F6,#2563EB);color:#fff;padding:10px 14px;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(37,99,235,.3)}
+.hd-top{display:flex;align-items:center;justify-content:space-between}
+.hd h1{font-size:16px;font-weight:700}
+.hd .yr{font-size:11px;background:rgba(255,255,255,.2);padding:2px 8px;border-radius:10px}
+.hd-row{display:flex;align-items:center;gap:6px;margin-top:8px}
+.hd-row label{font-size:11px;opacity:.9;white-space:nowrap}
+.hd-row input,.hd-row select{padding:5px 8px;border:none;border-radius:6px;font-size:13px;background:rgba(255,255,255,.92);flex:1;min-width:0}
+.hd-row select{flex:none;width:auto}
+.sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+.sync-on{background:#4ADE80;box-shadow:0 0 4px #4ADE80}
+.sync-off{background:#F87171}
+.nav{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;border-top:1px solid var(--g200);z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.nav-i{flex:1;display:flex;flex-direction:column;align-items:center;padding:7px 2px 5px;cursor:pointer;color:var(--g400);font-size:10px;transition:color .15s}
+.nav-i.on{color:var(--pri)}
+.nav-i .ic{font-size:20px;margin-bottom:1px}
+.vw{display:none;padding:10px}.vw.on{display:block}
+.cd{background:#fff;border-radius:var(--rad);padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.cd-t{font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px}
+.b{display:inline-flex;align-items:center;justify-content:center;gap:3px;padding:7px 12px;border:none;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.b:active{transform:scale(.96)}
+.b-p{background:var(--pri);color:#fff}.b-g{background:var(--care);color:#fff}.b-r{background:var(--red);color:#fff}
+.b-o{background:#fff;color:var(--pri);border:1.5px solid var(--pri)}
+.b-w{background:#fff;color:var(--int);border:1.5px solid var(--int)}
+.b-gray{background:var(--g100);color:var(--g600);border:1.5px solid var(--g200)}
+.b-sm{padding:5px 9px;font-size:11px}
+.tg{display:inline-block;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:500;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tg-c{background:var(--care-bg);color:var(--care);border:1px solid #BBF7D0}
+.tg-i{background:var(--int-bg);color:var(--int);border:1px solid #FED7AA}
+.tg-click{cursor:pointer}.tg-click:active{transform:scale(.93)}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -4px;padding:0 4px}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:620px}
+th,td{padding:8px 4px;text-align:center;border-bottom:1px solid var(--g100)}
+th{background:var(--g100);font-weight:600;font-size:11px;color:var(--g600)}
+.ck{width:22px;height:22px;cursor:pointer;accent-color:var(--care)}
+.fl{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.fl select{padding:6px 8px;border:1.5px solid var(--g200);border-radius:7px;font-size:13px;background:#fff;min-width:0;flex:1}
+.fl label{font-size:11px;color:var(--g600);white-space:nowrap}
+.wk{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:4px}
+.wk-info{text-align:center;flex:1}
+.wk-info .n{font-size:14px;font-weight:700}
+.wk-info .d{font-size:11px;color:var(--g400);margin-top:1px}
+.sf{background:var(--pri-l);padding:10px 12px;border-radius:8px;margin-top:10px;font-size:12px;line-height:2}
+.lg{padding:8px 0;border-bottom:1px solid var(--g100);font-size:11px;line-height:1.6}
+.lg .t{color:var(--g400)}.lg .o{color:var(--pri);font-weight:600}
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-end;justify-content:center}
+.mo.on{display:flex}
+.md{background:#fff;border-radius:16px 16px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));width:100%;max-width:480px;max-height:85vh;overflow-y:auto;animation:up .2s ease}
+@keyframes up{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+.md h3{font-size:16px;font-weight:700;margin-bottom:14px}
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:12px;color:var(--g600);margin-bottom:4px;font-weight:500}
+.fg input,.fg select{width:100%;padding:10px 12px;border:1.5px solid var(--g200);border-radius:8px;font-size:14px;background:#fff}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--pri)}
+.ma{display:flex;gap:10px;margin-top:16px}
+.ma .b{flex:1;padding:11px}
+.ts{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:var(--g800);color:#fff;padding:9px 18px;border-radius:20px;font-size:12px;z-index:999;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+.ts.on{opacity:1}
+.ep{text-align:center;padding:36px 16px;color:var(--g400)}
+.ep .ic{font-size:40px;margin-bottom:8px}
+.cm{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.cm label{width:50px;font-size:12px;font-weight:600}
+.cm select{flex:1;padding:7px;border:1.5px solid var(--g200);border-radius:7px;font-size:12px}
+.fee{color:var(--red);font-weight:700}
+.qb{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+tr.stopped{background:var(--red-bg)!important;opacity:.7}
+tr.stopped td{color:var(--red)}
+.badge-stop{display:inline-block;background:var(--red);color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;margin-left:3px;vertical-align:middle}
+.badge-active{display:inline-block;background:var(--care);color:#fff;font-size:9px;padding:1px 5px;border-radius:3px;margin-left:3px;vertical-align:middle}
+.divider-row td{background:var(--g100);font-size:11px;color:var(--g400);font-weight:600;padding:6px;text-align:left}
+.att-cell{cursor:pointer;padding:4px 2px;border-radius:6px;transition:background .15s;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:44px}
+.att-cell:active{background:var(--g100)}
+.att-cell .sub{font-size:9px;color:var(--g400)}
+.att-cell .sub.absent{color:var(--red)}
+.as-item{display:flex;align-items:center;gap:10px;padding:14px 12px;border:none;background:none;width:100%;font-size:15px;cursor:pointer;border-bottom:1px solid var(--g100);text-align:left}
+.as-item:active{background:var(--g50)}
+.as-item .as-ic{font-size:20px;width:28px;text-align:center}
+.as-cancel{margin-top:8px;width:100%;padding:14px;border:none;background:var(--g100);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+.as-title{font-size:14px;font-weight:700;padding:4px 0 6px}
+.as-sub{font-size:11px;color:var(--g400);padding-bottom:10px}
+.online-bar{font-size:10px;opacity:.8;margin-top:4px}
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <div class="hd-top"><h1>📋 基础托管考勤</h1><span class="yr">2026-2027学年</span></div>
+  <div class="hd-row">
+    <label>操作者</label><input type="text" id="opName" placeholder="姓名">
+    <label>学年</label><select id="selYear"><option>2026-2027</option></select>
+  </div>
+  <div class="online-bar"><span class="sync-dot sync-off" id="syncDot"></span><span id="syncTxt">连接中...</span></div>
+</div>
+<div class="ts" id="toast"></div>
+
+<!-- 名单 -->
+<div class="vw on" id="vRoster">
+  <div class="cd">
+    <div class="cd-t"><span>🏫 托管班管理</span><button class="b b-p b-sm" onclick="mAddCare()">+ 添加托管班</button></div>
+    <div class="fl"><select id="selCare" onchange="renderRoster()"></select>
+      <button class="b b-o b-sm" onclick="mRenCare()">改名</button>
+      <button class="b b-r b-sm" onclick="delCare()">删除</button>
+    </div>
+  </div>
+  <div class="cd">
+    <div class="cd-t"><span>👥 学生名单</span>
+      <div style="display:flex;gap:5px"><button class="b b-p b-sm" onclick="mAddStu()">+ 添加</button><button class="b b-o b-sm" onclick="mUpload()">📁 上传</button></div>
+    </div>
+    <div class="fl"><label>原班级</label><select id="fltOrig" onchange="renderRoster()"><option value="all">全部</option></select>
+      <label>状态</label><select id="fltStatus" onchange="renderRoster()"><option value="all">全部</option><option value="active">在托</option><option value="stopped">已停托</option></select>
+    </div>
+    <div class="tw"><table><thead><tr><th>原班级</th><th>学号</th><th>姓名</th><th>状态</th><th>周一</th><th>周二</th><th>周三</th><th>周四</th><th>周五</th><th>操作</th></tr></thead><tbody id="rosB"></tbody></table></div>
+    <div class="ep" id="rosE" style="display:none"><div class="ic">📭</div><p>暂无学生</p></div>
+  </div>
+</div>
+
+<!-- 考勤 -->
+<div class="vw" id="vAtt">
+  <div class="cd">
+    <div class="cd-t"><span>✅ 周考勤</span></div>
+    <div class="fl"><label>托管班</label><select id="attCare" onchange="renderAtt()"></select></div>
+    <div class="wk"><button class="b b-o b-sm" onclick="wkNav(-1)">◀</button><div class="wk-info"><div class="n" id="wkN"></div><div class="d" id="wkD"></div></div><button class="b b-o b-sm" onclick="wkNav(1)">▶</button></div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+      <button class="b b-o b-sm" onclick="wkNow()">📍本周</button>
+      <select id="wkJump" onchange="wkTo(this.value)" style="padding:5px 6px;border:1.5px solid var(--g200);border-radius:7px;font-size:11px;flex:1;min-width:0"></select>
+    </div>
+    <div class="qb"><button class="b b-g b-sm" onclick="attAll()">✅ 一键全勤</button><button class="b b-w b-sm" onclick="attClear()">↩️ 清空本周</button></div>
+    <p style="font-size:10px;color:var(--g400);margin-bottom:8px">💡 点击单元格：打勾/取消/改兴趣课/改回托管</p>
+    <div class="tw"><table><thead><tr><th>原班级</th><th>学号</th><th>姓名</th><th>周一</th><th>周二</th><th>周三</th><th>周四</th><th>周五</th><th>到校</th><th>费用</th></tr></thead><tbody id="attB"></tbody></table></div>
+    <div class="ep" id="attE" style="display:none"><div class="ic">📭</div><p>暂无在托学生</p></div>
+    <div class="sf" id="attSum"></div>
+  </div>
+</div>
+
+<!-- 总表 -->
+<div class="vw" id="vSum">
+  <div class="cd">
+    <div class="cd-t"><span>💰 费用总表</span></div>
+    <div class="fl"><label>托管班</label><select id="sumCare" onchange="renderSum()"></select>
+      <label>状态</label><select id="sumStatus" onchange="renderSum()"><option value="all">全部</option><option value="active">在托</option><option value="stopped">已停托</option></select>
+    </div>
+    <div class="tw"><table><thead><tr><th>原班级</th><th>学号</th><th>姓名</th><th>状态</th><th>到校天数</th><th>课时</th><th>费用</th></tr></thead><tbody id="sumB"></tbody></table></div>
+    <div class="sf" id="sumF"></div>
+  </div>
+</div>
+
+<!-- 记录 -->
+<div class="vw" id="vLog">
+  <div class="cd">
+    <div class="cd-t"><span>📋 操作记录</span>
+      <div style="display:flex;gap:5px"><button class="b b-o b-sm" onclick="doExport()">📤导出</button><button class="b b-o b-sm" onclick="document.getElementById('impF').click()">📥导入</button><input type="file" id="impF" accept=".json" hidden onchange="doImport(event)"></div>
+    </div>
+    <div id="logL"></div>
+    <div class="ep" id="logE" style="display:none"><div class="ic">📝</div><p>暂无记录</p></div>
+  </div>
+</div>
+
+<div class="nav">
+  <div class="nav-i on" onclick="go('Roster')"><span class="ic">👥</span>名单</div>
+  <div class="nav-i" onclick="go('Att')"><span class="ic">✅</span>考勤</div>
+  <div class="nav-i" onclick="go('Sum')"><span class="ic">💰</span>总表</div>
+  <div class="nav-i" onclick="go('Log')"><span class="ic">📋</span>记录</div>
+</div>
+
+<!-- Modals -->
+<div class="mo" id="mCare"><div class="md"><h3 id="mCareT">添加托管班</h3><div class="fg"><label>托管班名称</label><input id="mCareN" placeholder="如：一年级托管班"></div><div class="ma"><button class="b b-o" onclick="cx('mCare')">取消</button><button class="b b-p" id="mCareB">确定</button></div></div></div>
+<div class="mo" id="mStu"><div class="md"><h3 id="mStuT">添加学生</h3><div class="fg"><label>原班级</label><input id="mStuC" placeholder="如：一(1)班"></div><div class="fg"><label>学号</label><input id="mStuI" placeholder="学号"></div><div class="fg"><label>姓名</label><input id="mStuN" placeholder="姓名"></div><div class="ma"><button class="b b-o" onclick="cx('mStu')">取消</button><button class="b b-p" onclick="saveStu()">保存</button></div></div></div>
+<div class="mo" id="mSch"><div class="md"><h3>修改课程安排</h3><p style="font-size:12px;color:var(--g400);margin-bottom:10px" id="mSchInfo"></p><div class="fg"><label>日期</label><select id="mSchD"><option value="mon">周一</option><option value="tue">周二</option><option value="wed">周三</option><option value="thu">周四</option><option value="fri">周五</option></select></div><div class="fg"><label>类型</label><select id="mSchT" onchange="schType()"><option value="基础托管">基础托管</option><option value="custom">特色兴趣课</option></select></div><div class="fg" id="mSchCG" style="display:none"><label>兴趣课名称</label><input id="mSchCN" placeholder="如：美术、篮球"></div><p style="font-size:11px;color:var(--care);margin-top:4px">💡 自动同步到所有未考勤周</p><div class="ma"><button class="b b-o" onclick="cx('mSch')">取消</button><button class="b b-p" onclick="saveSch()">保存</button></div></div></div>
+<div class="mo" id="mUp"><div class="md"><h3>上传名单</h3><div class="fg"><label>文件</label><input type="file" id="upF" accept=".xlsx,.xls,.csv" style="width:100%;padding:8px"></div><div id="upPrev" style="display:none"><p style="font-size:12px;color:var(--g400);margin-bottom:8px">确认列对应：</p><div id="upMap"></div></div><div class="ma"><button class="b b-o" onclick="cx('mUp')">取消</button><button class="b b-p" id="upBtn" onclick="doUpload()" style="display:none">确认导入</button></div></div></div>
+<div class="mo" id="mCf"><div class="md"><h3 id="mCfT">确认</h3><p id="mCfM" style="font-size:13px;color:var(--g600);margin-bottom:14px;white-space:pre-line"></p><div class="ma"><button class="b b-o" onclick="cx('mCf')">取消</button><button class="b b-r" id="mCfB">确定</button></div></div></div>
+<div class="mo" id="mAS"><div class="md" style="padding-bottom:calc(12px + env(safe-area-inset-bottom))"><div class="as-title" id="asTitle"></div><div class="as-sub" id="asSub"></div><div id="asItems"></div><button class="as-cancel" onclick="cx('mAS')">取消</button></div></div>
+<div class="mo" id="mAttInt"><div class="md"><h3>改为兴趣课</h3><p style="font-size:12px;color:var(--g400);margin-bottom:10px" id="mAttIntInfo"></p><div class="fg"><label>兴趣课名称</label><input id="mAttIntN" placeholder="如：美术、篮球、编程"></div><div class="ma"><button class="b b-o" onclick="cx('mAttInt')">取消</button><button class="b b-p" onclick="doAttToInt()">确定</button></div></div></div>
+
+<script>
+// ==================== 连接服务器 ====================
+const socket = io();
+const DAYS=['mon','tue','wed','thu','fri'],DN={mon:'周一',tue:'周二',wed:'周三',thu:'周四',fri:'周五'},R=2.4,H=2;
+let D={cares:[],stus:[],att:{},logs:[]},wkIdx=0,editK=null,schK=null,upRaw=null,upH=[];
+let asKey=null,asDay=null,asWk=null;
+let WEEKS=[];
+
+// 收到服务器数据 → 更新本地 → 重新渲染
+socket.on('connect',()=>{setSync(true)});
+socket.on('disconnect',()=>{setSync(false)});
+socket.on('data-updated',(data)=>{
+  D=data;
+  if(!D.cares)D.cares=[];if(!D.stus)D.stus=[];if(!D.att)D.att={};if(!D.logs)D.logs=[];
+  refreshSel();renderRoster();
+  if(document.getElementById('vAtt').classList.contains('on'))renderAtt();
+  if(document.getElementById('vSum').classList.contains('on'))renderSum();
+  if(document.getElementById('vLog').classList.contains('on'))renderLog();
+});
+
+function setSync(on){
+  document.getElementById('syncDot').className='sync-dot '+(on?'sync-on':'sync-off');
+  document.getElementById('syncTxt').textContent=on?'已连接·多设备同步中':'未连接';
+}
+
+// 发送patch到服务器（所有设备实时同步）
+function patch(type,payload){
+  socket.emit('patch',{type,payload});
+}
+function addLog(c){
+  const o=document.getElementById('opName').value.trim()||'未知';
+  patch('addLog',{t:new Date().toLocaleString('zh-CN'),o,c});
+}
+
+// ==================== 学期周次 ====================
+function initWeeks(){
+  const s=new Date(2026,8,1),e=new Date(2027,0,17);
+  let m=new Date(s);const dw=m.getDay()||7;m.setDate(m.getDate()-dw+1);
+  WEEKS=[];let i=1;
+  while(m<=e){const f=new Date(m);f.setDate(m.getDate()+4);WEEKS.push({i,m:new Date(m),f,k:fd(m)});m.setDate(m.getDate()+7);i++}
+  document.getElementById('wkJump').innerHTML='<option value="">跳转周次...</option>'+WEEKS.map((w,i)=>`<option value="${i}">第${w.i}周 ${fs(w.m)}-${fs(w.f)}</option>`).join('');
+}
+function fd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function fs(d){return(d.getMonth()+1)+'/'+d.getDate()}
+function curWk(){const t=new Date();for(let i=0;i<WEEKS.length;i++){const sun=new Date(WEEKS[i].m);sun.setDate(sun.getDate()+6);if(t>=WEEKS[i].m&&t<=sun)return i}if(t<WEEKS[0].m)return 0;return WEEKS.length-1}
+function wkNav(d){wkIdx=Math.max(0,Math.min(WEEKS.length-1,wkIdx+d));renderAtt()}
+function wkNow(){wkIdx=curWk();renderAtt()}
+function wkTo(v){if(v!==''){wkIdx=+v;renderAtt()}}
+
+// ==================== UI ====================
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),1800)}
+function op(id){document.getElementById(id).classList.add('on')}
+function cx(id){document.getElementById(id).classList.remove('on')}
+document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('on')}));
+function go(n){document.querySelectorAll('.vw').forEach(v=>v.classList.remove('on'));document.getElementById('v'+n).classList.add('on');document.querySelectorAll('.nav-i').forEach((x,i)=>x.classList.toggle('on',['Roster','Att','Sum','Log'][i]===n));if(n==='Att')renderAtt();if(n==='Sum')renderSum();if(n==='Log')renderLog()}
+
+function refreshSel(){
+  const cs=D.cares.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  ['selCare','attCare'].forEach(id=>{const s=document.getElementById(id);const v=s.value;s.innerHTML=cs;if(v&&s.querySelector(`option[value="${v}"]`))s.value=v});
+  const ss=document.getElementById('sumCare');const sv2=ss.value;
+  ss.innerHTML='<option value="all">全部托管班</option>'+cs;if(sv2&&ss.querySelector(`option[value="${sv2}"]`))ss.value=sv2;
+  const os=[...new Set(D.stus.map(s=>s.oc).filter(Boolean))].sort();
+  const of=document.getElementById('fltOrig');const ov=of.value;
+  of.innerHTML='<option value="all">全部</option>'+os.map(o=>`<option value="${o}">${o}</option>`).join('');
+  if(ov&&of.querySelector(`option[value="${ov}"]`))of.value=ov;
+}
+
+// ==================== 托管班 ====================
+function mAddCare(){document.getElementById('mCareT').textContent='添加托管班';document.getElementById('mCareN').value='';document.getElementById('mCareB').onclick=()=>{const n=document.getElementById('mCareN').value.trim();if(!n){toast('请输入');return}const c={id:'c'+Date.now(),name:n};patch('addCare',c);addLog('添加托管班：'+n);cx('mCare');toast('已添加')};op('mCare')}
+function mRenCare(){const id=document.getElementById('selCare').value;if(!id){toast('先选择');return}const c=D.cares.find(x=>x.id===id);document.getElementById('mCareT').textContent='重命名';document.getElementById('mCareN').value=c.name;document.getElementById('mCareB').onclick=()=>{const n=document.getElementById('mCareN').value.trim();if(!n){toast('请输入');return}patch('updateCare',{id:c.id,name:n});addLog(`托管班改名：${c.name}→${n}`);cx('mCare');toast('已修改')};op('mCare')}
+function delCare(){const id=document.getElementById('selCare').value;if(!id)return;const c=D.cares.find(x=>x.id===id);document.getElementById('mCfT').textContent='删除托管班';document.getElementById('mCfM').textContent=`删除"${c.name}"及所有学生？不可恢复！`;document.getElementById('mCfB').onclick=()=>{patch('delCare',{id});addLog('删除托管班：'+c.name);cx('mCf');toast('已删除')};op('mCf')}
+
+// ==================== 名单 ====================
+function renderRoster(){
+  const cc=document.getElementById('selCare').value,of=document.getElementById('fltOrig').value,sf=document.getElementById('fltStatus').value;
+  let list=D.stus.filter(s=>s.cc===cc);
+  if(of!=='all')list=list.filter(s=>s.oc===of);
+  if(sf==='active')list=list.filter(s=>s.status!=='stopped');
+  if(sf==='stopped')list=list.filter(s=>s.status==='stopped');
+  list.sort((a,b)=>{const sa=a.status==='stopped'?1:0,sb=b.status==='stopped'?1:0;if(sa!==sb)return sa-sb;return(a.sid||'').localeCompare(b.sid||'')});
+  const tb=document.getElementById('rosB'),ep=document.getElementById('rosE');
+  if(!list.length){tb.innerHTML='';ep.style.display='block';return}
+  ep.style.display='none';
+  let html='',div=false;
+  list.forEach(s=>{
+    const st=s.status==='stopped';
+    if(st&&!div){html+=`<tr class="divider-row"><td colspan="10">── 已停止托管 ──</td></tr>`;div=true}
+    const ds=DAYS.map(d=>{const v=s.sch[d]||'基础托管';const cl=v==='基础托管'?'tg-c tg-click':'tg-i tg-click';return`<td><span class="tg ${cl}" onclick="mSch('${s.key}','${d}')">${v}</span></td>`}).join('');
+    const badge=st?'<span class="badge-stop">停托</span>':'<span class="badge-active">在托</span>';
+    const stopBtn=st?`<button class="b b-g b-sm" onclick="resumeStu('${s.key}')">恢复</button>`:`<button class="b b-r b-sm" onclick="stopStu('${s.key}')">停托</button>`;
+    html+=`<tr class="${st?'stopped':''}"><td>${s.oc||'-'}</td><td>${s.sid}</td><td>${s.name}${badge}</td><td>${st?'🔴':'🟢'}</td>${ds}<td><button class="b b-o b-sm" onclick="mEditStu('${s.key}')">✏️</button> ${stopBtn} <button class="b b-gray b-sm" onclick="delStu('${s.key}')">🗑</button></td></tr>`;
+  });
+  tb.innerHTML=html;
+}
+function mAddStu(){const cc=document.getElementById('selCare').value;if(!cc){toast('先选择托管班');return}editK=null;document.getElementById('mStuT').textContent='添加学生';document.getElementById('mStuC').value='';document.getElementById('mStuI').value='';document.getElementById('mStuN').value='';op('mStu')}
+function mEditStu(k){const s=D.stus.find(x=>x.key===k);if(!s)return;editK=k;document.getElementById('mStuT').textContent='修改学生';document.getElementById('mStuC').value=s.oc||'';document.getElementById('mStuI').value=s.sid;document.getElementById('mStuN').value=s.name;op('mStu')}
+function saveStu(){
+  const oc=document.getElementById('mStuC').value.trim(),sid=document.getElementById('mStuI').value.trim(),nm=document.getElementById('mStuN').value.trim();
+  if(!sid||!nm){toast('填写学号和姓名');return}
+  if(editK){patch('updateStu',{key:editK,oc,sid,name:nm});addLog(`修改学生：${sid} ${nm}`);toast('已修改')}
+  else{const cc=document.getElementById('selCare').value;const key='s'+Date.now()+Math.random().toString(36).substr(2,4);patch('addStu',{key,cc,oc,sid,name:nm,status:'active',stopWeek:null,sch:{mon:'基础托管',tue:'基础托管',wed:'基础托管',thu:'基础托管',fri:'基础托管'}});addLog(`添加学生：${oc} ${sid} ${nm}`);toast('已添加')}
+  cx('mStu');
+}
+function delStu(k){const s=D.stus.find(x=>x.key===k);if(!s)return;document.getElementById('mCfT').textContent='删除学生';document.getElementById('mCfM').textContent=`彻底删除"${s.sid} ${s.name}"？`;document.getElementById('mCfB').onclick=()=>{patch('delStu',{key:k});addLog(`删除学生：${s.sid} ${s.name}`);cx('mCf');toast('已删除')};op('mCf')}
+function stopStu(k){const s=D.stus.find(x=>x.key===k);if(!s)return;document.getElementById('mCfT').textContent='停止托管';document.getElementById('mCfM').textContent=`"${s.sid} ${s.name}"停止托管？\n• 考勤表不再显示\n• 名单/总表保留`;document.getElementById('mCfB').textContent='确认停托';document.getElementById('mCfB').onclick=()=>{patch('updateStu',{key:k,status:'stopped',stopWeek:wkIdx});addLog(`停托：${s.sid} ${s.name}`);cx('mCf');toast('已停托');document.getElementById('mCfB').textContent='确定'};op('mCf')}
+function resumeStu(k){const s=D.stus.find(x=>x.key===k);if(!s)return;document.getElementById('mCfT').textContent='恢复托管';document.getElementById('mCfM').textContent=`"${s.sid} ${s.name}"恢复托管？`;document.getElementById('mCfB').textContent='确认恢复';document.getElementById('mCfB').className='b b-g';document.getElementById('mCfB').onclick=()=>{patch('updateStu',{key:k,status:'active',stopWeek:null});addLog(`恢复：${s.sid} ${s.name}`);cx('mCf');toast('已恢复');document.getElementById('mCfB').textContent='确定';document.getElementById('mCfB').className='b b-r'};op('mCf')}
+
+// ==================== 课程修改+同步 ====================
+function mSch(k,d){const s=D.stus.find(x=>x.key===k);if(!s)return;schK=k;document.getElementById('mSchInfo').textContent=`${s.oc||''} ${s.sid} ${s.name}`;document.getElementById('mSchD').value=d;const v=s.sch[d]||'基础托管';if(v==='基础托管'){document.getElementById('mSchT').value='基础托管';document.getElementById('mSchCG').style.display='none'}else{document.getElementById('mSchT').value='custom';document.getElementById('mSchCG').style.display='block';document.getElementById('mSchCN').value=v}op('mSch')}
+function schType(){document.getElementById('mSchCG').style.display=document.getElementById('mSchT').value==='custom'?'block':'none'}
+function saveSch(){
+  const s=D.stus.find(x=>x.key===schK);if(!s)return;
+  const d=document.getElementById('mSchD').value,t=document.getElementById('mSchT').value;
+  let v='基础托管';if(t==='custom'){v=document.getElementById('mSchCN').value.trim();if(!v){toast('请输入');return}}
+  const newSch={...s.sch,[d]:v};
+  patch('syncSch',{stuKey:s.key,sch:newSch});
+  addLog(`课程变更：${s.sid} ${s.name} ${DN[d]}→${v}`);
+  cx('mSch');toast('已更新，未考勤周已同步');
+}
+
+// ==================== 考勤 ====================
+function getAttSch(wk,stu){
+  const wkey=WEEKS[wk].k;
+  if(!D.att[wkey])D.att[wkey]={};
+  if(!D.att[wkey][stu.key]){D.att[wkey][stu.key]={sch:{...stu.sch},pres:{}}}
+  return D.att[wkey][stu.key];
+}
+function renderAtt(){
+  if(!WEEKS.length)return;
+  const w=WEEKS[wkIdx],wkey=w.k;
+  document.getElementById('wkN').textContent=`第 ${w.i} 周 / 共 ${WEEKS.length} 周`;
+  document.getElementById('wkD').textContent=`${w.m.getFullYear()}.${fs(w.m)}（周一）— ${fs(w.f)}（周五）`;
+  const cc=document.getElementById('attCare').value;
+  let list=D.stus.filter(s=>s.cc===cc&&s.status==='active');
+  const tb=document.getElementById('attB'),ep=document.getElementById('attE');
+  if(!list.length){tb.innerHTML='';ep.style.display='block';document.getElementById('attSum').innerHTML='';return}
+  ep.style.display='none';
+  if(!D.att[wkey])D.att[wkey]={};
+  let totP=0,totF=0;
+  tb.innerHTML=list.map(s=>{
+    const rec=getAttSch(wkIdx,s);let pc=0;
+    const cells=DAYS.map(d=>{
+      const v=rec.sch[d]||'基础托管';
+      if(v==='基础托管'){
+        const ck=rec.pres[d]===true,ab=rec.pres[d]===false;
+        if(ck)pc++;
+        return`<td><div class="att-cell" onclick="openAS('${s.key}','${d}')"><input type="checkbox" class="ck" ${ck?'checked':''} onclick="event.stopPropagation()" onchange="quickAtt('${s.key}','${d}',this.checked)"><span class="sub ${ab?'absent':''}">${ck?'✓到校':ab?'✗缺勤':'托管'}</span></div></td>`;
+      }else{
+        return`<td><div class="att-cell" onclick="openAS('${s.key}','${d}')"><span class="tg tg-i">${v}</span><span class="sub">兴趣课</span></div></td>`;
+      }
+    }).join('');
+    const fee=(pc*H*R).toFixed(1);totP+=pc;totF+=pc*H*R;
+    return`<tr><td>${s.oc||'-'}</td><td>${s.sid}</td><td>${s.name}</td>${cells}<td><b>${pc}</b></td><td class="fee">¥${fee}</td></tr>`;
+  }).join('');
+  document.getElementById('attSum').innerHTML=`<b>本周：</b>${list.length}人 ｜ 到校${totP}人次 ｜ ${totP*H}课时 ｜ <b style="color:var(--red)">¥${totF.toFixed(1)}</b>`;
+}
+function quickAtt(k,d,v){
+  const wkey=WEEKS[wkIdx].k;
+  patch('setAtt',{weekKey:wkey,stuKey:k,day:d,value:v});
+  const s=D.stus.find(x=>x.key===k);
+  addLog(`考勤：${s?s.sid+' '+s.name:''} 第${WEEKS[wkIdx].i}周${DN[d]} ${v?'✓':'✗'}`);
+}
+function openAS(k,d){
+  asKey=k;asDay=d;asWk=wkIdx;
+  const s=D.stus.find(x=>x.key===k);if(!s)return;
+  const rec=getAttSch(wkIdx,s);const v=rec.sch[d]||'基础托管';
+  const isCare=v==='基础托管',isPres=rec.pres[d]===true,isAbs=rec.pres[d]===false;
+  document.getElementById('asTitle').textContent=`${s.oc||''} ${s.sid} ${s.name}`;
+  document.getElementById('asSub').textContent=`第${WEEKS[wkIdx].i}周 ${DN[d]} · ${v}${isCare?(isPres?' · ✓到校':isAbs?' · ✗缺勤':' · 未考勤'):''}`;
+  let html='';
+  if(isCare){
+    html+=`<button class="as-item" onclick="asPres()"><span class="as-ic">✅</span>标记到校</button>`;
+    html+=`<button class="as-item" onclick="asAbs()"><span class="as-ic">❌</span>标记缺勤</button>`;
+    html+=`<button class="as-item" onclick="asToInt()"><span class="as-ic">🎨</span>改为兴趣课</button>`;
+  }else{
+    html+=`<button class="as-item" onclick="asToCare()"><span class="as-ic">📗</span>改为基础托管</button>`;
+    html+=`<button class="as-item" onclick="asToInt()"><span class="as-ic">✏️</span>修改兴趣课名称</button>`;
+  }
+  document.getElementById('asItems').innerHTML=html;op('mAS');
+}
+function asPres(){patch('setAtt',{weekKey:WEEKS[asWk].k,stuKey:asKey,day:asDay,value:true});const s=D.stus.find(x=>x.key===asKey);addLog(`考勤：${s?s.sid:''} 第${WEEKS[asWk].i}周${DN[asDay]}✓`);cx('mAS')}
+function asAbs(){patch('setAtt',{weekKey:WEEKS[asWk].k,stuKey:asKey,day:asDay,value:false});const s=D.stus.find(x=>x.key===asKey);addLog(`考勤：${s?s.sid:''} 第${WEEKS[asWk].i}周${DN[asDay]}✗`);cx('mAS')}
+function asToInt(){cx('mAS');const s=D.stus.find(x=>x.key===asKey);const rec=getAttSch(asWk,s);const cur=rec.sch[asDay]||'基础托管';document.getElementById('mAttIntInfo').textContent=`${s.sid} ${s.name} · 第${WEEKS[asWk].i}周${DN[asDay]}`;document.getElementById('mAttIntN').value=(cur!=='基础托管')?cur:'';op('mAttInt')}
+function doAttToInt(){const nm=document.getElementById('mAttIntN').value.trim();if(!nm){toast('请输入');return}patch('setAttSch',{weekKey:WEEKS[asWk].k,stuKey:asKey,day:asDay,value:nm});const s=D.stus.find(x=>x.key===asKey);addLog(`变更：${s?s.sid:''} 第${WEEKS[asWk].i}周${DN[asDay]}→${nm}`);cx('mAttInt');toast('已改为：'+nm)}
+function asToCare(){patch('setAttSch',{weekKey:WEEKS[asWk].k,stuKey:asKey,day:asDay,value:'基础托管'});patch('setAtt',{weekKey:WEEKS[asWk].k,stuKey:asKey,day:asDay,value:false});const s=D.stus.find(x=>x.key===asKey);addLog(`变更：${s?s.sid:''} 第${WEEKS[asWk].i}周${DN[asDay]}→基础托管`);cx('mAS');toast('已改回托管')}
+function attAll(){const cc=document.getElementById('attCare').value;const list=D.stus.filter(s=>s.cc===cc&&s.status==='active');const wkey=WEEKS[wkIdx].k;let cnt=0;list.forEach(s=>{const rec=getAttSch(wkIdx,s);DAYS.forEach(d=>{if((rec.sch[d]||'基础托管')==='基础托管'){patch('setAtt',{weekKey:wkey,stuKey:s.key,day:d,value:true});cnt++}})});addLog(`一键全勤：第${WEEKS[wkIdx].i}周${cnt}人次`);toast('✅ 完成')}
+function attClear(){const cc=document.getElementById('attCare').value;const list=D.stus.filter(s=>s.cc===cc&&s.status==='active');const wkey=WEEKS[wkIdx].k;document.getElementById('mCfT').textContent='清空考勤';document.getElementById('mCfM').textContent=`清空第${WEEKS[wkIdx].i}周所有勾选？`;document.getElementById('mCfB').onclick=()=>{list.forEach(s=>{DAYS.forEach(d=>{patch('setAtt',{weekKey:wkey,stuKey:s.key,day:d,value:null})})});addLog(`清空：第${WEEKS[wkIdx].i}周`);cx('mCf');toast('已清空')};op('mCf')}
+
+// ==================== 总表 ====================
+function renderSum(){
+  const cf=document.getElementById('sumCare').value,sf=document.getElementById('sumStatus').value;
+  let list=D.stus;if(cf!=='all')list=list.filter(s=>s.cc===cf);
+  if(sf==='active')list=list.filter(s=>s.status!=='stopped');
+  if(sf==='stopped')list=list.filter(s=>s.status==='stopped');
+  list=[...list].sort((a,b)=>{const sa=a.status==='stopped'?1:0,sb=b.status==='stopped'?1:0;if(sa!==sb)return sa-sb;return(a.sid||'').localeCompare(b.sid||'')});
+  const tb=document.getElementById('sumB');let tD=0,tH=0,tF=0;
+  tb.innerHTML=list.map(s=>{
+    let days=0;WEEKS.forEach(w=>{const rec=D.att[w.k]&&D.att[w.k][s.key];if(rec){DAYS.forEach(d=>{if((rec.sch[d]||'基础托管')==='基础托管'&&rec.pres[d]===true)days++})}});
+    const hrs=days*H,fee=hrs*R;tD+=days;tH+=hrs;tF+=fee;
+    const st=s.status==='stopped';
+    return`<tr class="${st?'stopped':''}"><td>${s.oc||'-'}</td><td>${s.sid}</td><td>${s.name}${st?'<span class="badge-stop">停托</span>':''}</td><td>${st?'🔴':'🟢'}</td><td>${days}</td><td>${hrs}</td><td class="fee">¥${fee.toFixed(1)}</td></tr>`;
+  }).join('');
+  document.getElementById('sumF').innerHTML=`<b>汇总：</b>${list.length}人 ｜ ${tD}天 ｜ ${tH}课时 ｜ <b style="color:var(--red)">¥${tF.toFixed(1)}</b>`;
+}
+
+// ==================== 上传 ====================
+function mUpload(){const cc=document.getElementById('selCare').value;if(!cc){toast('先选择托管班');return}document.getElementById('upF').value='';document.getElementById('upPrev').style.display='none';document.getElementById('upBtn').style.display='none';upRaw=null;op('mUp')}
+document.getElementById('upF').addEventListener('change',function(e){const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=function(ev){try{const wb=XLSX.read(ev.target.result,{type:'array'});const ws=wb.Sheets[wb.SheetNames[0]];const j=XLSX.utils.sheet_to_json(ws,{header:1});if(j.length<2){toast('数据不足');return}upH=j[0].map(h=>String(h).trim());upRaw=j.slice(1).filter(r=>r.some(c=>c!==undefined&&c!==''));renderMap()}catch(er){toast('读取失败')}};rd.readAsArrayBuffer(f)});
+function renderMap(){const fs=[{k:'oc',l:'原班级'},{k:'sid',l:'学号'},{k:'name',l:'姓名'},{k:'mon',l:'周一'},{k:'tue',l:'周二'},{k:'wed',l:'周三'},{k:'thu',l:'周四'},{k:'fri',l:'周五'}];const kw={oc:['班级','原班','class'],sid:['学号','编号','id'],name:['姓名','名字','学生'],mon:['周一','mon'],tue:['周二','tue'],wed:['周三','wed'],thu:['周四','thu'],fri:['周五','fri']};const mt={};fs.forEach(f=>{let m=-1;for(let i=0;i<upH.length;i++){if(kw[f.k].some(k=>upH[i].includes(k))){m=i;break}}mt[f.k]=m});document.getElementById('upMap').innerHTML=fs.map(f=>`<div class="cm"><label>${f.l}</label><select id="cm_${f.k}"><option value="-1">--</option>${upH.map((h,i)=>`<option value="${i}" ${mt[f.k]===i?'selected':''}>${h}</option>`).join('')}</select></div>`).join('');document.getElementById('upPrev').style.display='block';document.getElementById('upBtn').style.display='inline-flex'}
+function doUpload(){const ci={};['oc','sid','name','mon','tue','wed','thu','fri'].forEach(f=>ci[f]=+document.getElementById('cm_'+f).value);if(ci.sid<0||ci.name<0){toast('至少匹配学号和姓名');return}const cc=document.getElementById('selCare').value;let n=0;upRaw.forEach(r=>{const sid=String(r[ci.sid]||'').trim(),nm=String(r[ci.name]||'').trim();if(!sid&&!nm)return;const oc=ci.oc>=0?String(r[ci.oc]||'').trim():'';const sch={};DAYS.forEach(d=>{if(ci[d]>=0){const v=String(r[ci[d]]||'').trim();sch[d]=(v&&v!=='基础托管')?v:'基础托管'}else sch[d]='基础托管'});patch('addStu',{key:'s'+Date.now()+Math.random().toString(36).substr(2,4)+'_'+n,cc,oc,sid,name:nm,status:'active',stopWeek:null,sch});n++});addLog(`上传导入${n}人`);cx('mUp');toast(`导入${n}人`)}
+
+// ==================== 记录/导出/导入 ====================
+function renderLog(){const l=document.getElementById('logL'),e=document.getElementById('logE');if(!D.logs.length){l.innerHTML='';e.style.display='block';return}e.style.display='none';l.innerHTML=D.logs.slice(0,80).map(x=>`<div class="lg"><span class="t">${x.t}</span>｜<span class="o">${x.o}</span><br>${x.c}</div>`).join('')}
+function doExport(){const b=new Blob([JSON.stringify(D,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`托管考勤_${new Date().toISOString().slice(0,10)}.json`;a.click();toast('已导出')}
+function doImport(e){const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=function(ev){try{const d=JSON.parse(ev.target.result);if(d.stus){patch('fullReplace',d);addLog('导入备份');toast('导入成功')}else toast('格式错误')}catch(er){toast('导入失败')}};rd.readAsText(f);e.target.value=''}
+
+// ==================== 初始化 ====================
+initWeeks();wkIdx=curWk();
+const so=localStorage.getItem('care_op');if(so)document.getElementById('opName').value=so;
+document.getElementById('opName').addEventListener('change',function(){localStorage.setItem('care_op',this.value.trim())});
+</script>
+</body>
+</html>
